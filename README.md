@@ -1,166 +1,137 @@
-<p align="center">
-  <img src="logo.png" width="120" alt="CSM Logo"/>
-</p>
-<h1 align="center">CSM Satellite</h1>
+# Lido Staking Module Discovery
 
-## Overview
+Node Operator search and pagination for CSM and Curated Module v2 through a single, efficient contract.
 
-The `CSMSatellite` contract provides efficient search and pagination functionality for Lido's Community Staking Module (CSM). It enables finding Node Operators by address and querying deposit queue information through optimized search algorithms.
+## Why SMDiscovery?
 
-### Key Features
-
-- **Address-based Node Operator search** with pagination support
-- **Multiple search modes**: current addresses, proposed addresses, or all addresses
-- **Deposit queue batch pagination** using linked-list traversal for efficient queue navigation
-- **Depositable validators count retrieval** for analytics and monitoring with pagination
-- **Cross-chain deployment** support for Mainnet, Holesky, and Hoodi testnet
+- **CSM & CMv2 Support**: Works with Community Staking Module (full support) and Curated Module v2 (basic discovery)
+- **Dynamic Routing**: Module addresses resolved via StakingRouter
+- **Stateless & Simple**: No ownership, explicit cache management
+- **Interface Detection**: Gracefully handles CSM-specific features (deposit queues)
+- **Future-Proof**: Compatible with any module implementing IStakingModule
 
 ## Architecture
 
-### Core Components
+### Core Contract: SMDiscovery.sol
 
-- **`CSMSatellite.sol`** - Main contract providing search functionality
-- **`ICSModule.sol`** - Interface to the Community Staking Module
-- **Deployment Scripts** - Chain-specific deployment configurations
+Provides Node Operator discovery for CSM and CMv2:
 
-### Supported Networks
+- `findNodeOperatorsByAddress(moduleId, ...)` - Search by address with pagination
+- `getNodeOperatorsByAddress(moduleId, ...)` - Get operator details by current address
+- `getNodeOperatorsByProposedAddress(moduleId, ...)` - Get operator details by proposed address
+- `updateModuleCache(moduleId)` - Cache module address for efficient queries
 
-- **Mainnet** (Chain ID: 1): `0xf1199B61429E16e5c9F1a3f73A1190b52Bc81ddc`
-- **Hoodi** (Chain ID: 560048): `0x3A981c53C16C03D6d58A9b1199C77752dE7BC956`
+### CSM-Specific Features
 
-## Getting Started
+When querying CSM modules, additional functions available:
 
-### Prerequisites
+- `getNodeOperatorsDepositableValidatorsCount(moduleId, offset, limit)` - Paginated depositable validator counts per operator
+- `getDepositQueueBatches(moduleId, queuePriority, cursorIndex, limit)` - Traverse deposit queue using linked-list with `batch.next()`
 
-- [Foundry](https://book.getfoundry.sh/getting-started/installation) - Smart contract development framework
-- [Just](https://github.com/casey/just) - Command runner
+Returns structs with operator IDs, key counts, and next pointers for efficient queue traversal.
 
-### Installation
+**Note:** These queue operations only work with CSM. Calling them on CMv2 will revert with `ModuleDoesNotSupportQueueOperations`.
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   forge install
-   ```
+### Module IDs
 
-3. Configure environment variables:
-   ```bash
-   cp .env.sample .env
-   ```
-   Fill in the required variables in the `.env` file
+#### Mainnet (Chain ID: 1)
 
-4. Build contracts:
-   ```bash
-   just
-   ```
+| Module                          | ID | Contract Address                             |
+|---------------------------------|----|----------------------------------------------|
+| Community Staking Module (CSM)  | 3  | `0xdA7dE2ECdDfccC6c3AF10108Db212ACBBf9EA83F` |
+| Curated Module (CM)             | 4  | TBD                                          |
 
-## Development
+#### Hoodi Testnet (Chain ID: 560048)
 
-### Available Commands
-
-```bash
-# Build and clean (default)
-just
-
-# Build contracts only
-just build
-
-# Clean build artifacts
-just clean
-
-# Deploy to local fork (requires Anvil)
-just deploy
-
-# Dry run deployment
-just deploy-live-dry
-
-# Deploy to live network
-just deploy-live
-
-# Deploy without confirmation
-just deploy-live-no-confirm
-
-# Verify contracts on block explorer
-just verify-live
-```
-
-### Environment Configuration
-
-Set these environment variables in your `.env` file:
-
-- `CHAIN` - Target chain (mainnet, holesky, hoodi) - defaults to mainnet
-- `RPC_URL` - RPC endpoint for live deployments
-- `ANVIL_IP_ADDR` - Anvil host address (defaults to 127.0.0.1)
-
-### Chain Selection
-
-The deployment script is automatically selected based on the `CHAIN` environment variable:
-- `mainnet` → `DeployMainnet.s.sol`
-- `holesky` → `DeployHolesky.s.sol`
-- `hoodi` → `DeployHoodi.s.sol`
+| Module                          | ID | Contract Address                             |
+|---------------------------------|----|----------------------------------------------|
+| Community Staking Module (CSM)  | 4  | `0x79CEf36D84743222f37765204Bec41E92a93E59d` |
+| Curated Module (CM)             | 5  | TBD                                          |
 
 ## Deployment
 
-### Local Development
+### Local Fork
+```bash
+just deploy
+```
 
-1. Start Anvil:
-   ```bash
-   anvil
-   ```
+### Live Network
+```bash
+# Dry run (recommended first)
+CHAIN=mainnet just deploy-live-dry
 
-2. Deploy to local fork:
-   ```bash
-   just deploy
-   ```
+# Deploy to mainnet
+CHAIN=mainnet RPC_URL=<your-rpc> just deploy-live
 
-### Live Network Deployment
+# Verify on block explorer
+CHAIN=mainnet RPC_URL=<your-rpc> just verify-live
+```
 
-1. Set up your environment variables in `.env`
+### Environment Variables
 
-2. Run dry deployment to verify:
-   ```bash
-   just deploy-live-dry
-   ```
+- `CHAIN`: Target chain (`mainnet`, `hoodi`) - defaults to `mainnet`
+- `RPC_URL`: RPC endpoint for live deployments
+- `ANVIL_IP_ADDR`: Anvil host address (defaults to `127.0.0.1`)
 
-3. Deploy to live network:
-   ```bash
-   just deploy-live
-   ```
+## Usage Example
 
-4. Move deployment artifacts:
-   ```bash
-   mv ./artifacts/latest ./artifacts/$CHAIN
-   ```
+```solidity
+// Deploy SMDiscovery
+SMDiscovery discovery = new SMDiscovery(stakingRouterAddress);
 
-### Deployment Artifacts
+// Initialize cache for modules you need
+discovery.updateModuleCache(3); // CSM (mainnet)
+discovery.updateModuleCache(4); // Curated Module (mainnet)
 
-- Live deployment artifacts are stored in `./artifacts/latest/`
-- Chain-specific artifacts should be moved to `./artifacts/$CHAIN/`
-- Transaction records are saved in `transactions.json`
+// Search for Node Operators by address
+uint256[] memory operatorIds = discovery.findNodeOperatorsByAddress(
+    3,                                      // moduleId (CSM on mainnet)
+    0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb,
+    0,                                      // offset
+    100,                                    // limit
+    SearchMode.CURRENT_ADDRESSES            // search mode enum
+);
+
+// Get operator details by current address
+SMDiscovery.NodeOperatorShort[] memory operators =
+    discovery.getNodeOperatorsByAddress(3, targetAddress, 0, 100);
+// Returns: id, managerAddress, rewardAddress, extendedManagerPermissions, curveId
+
+// Get CSM-specific data (deposit queue)
+SMDiscovery.DepositQueueBatchInfo[] memory batches =
+    discovery.getDepositQueueBatches(
+        3,          // moduleId
+        0,          // queuePriority (0 = highest priority)
+        0,          // cursorIndex (start of queue)
+        10          // limit
+    );
+```
+
+## Build Commands
+
+```bash
+just                # Clean and build (default)
+just build          # Build contracts
+just clean          # Clean artifacts
+```
+
+## Contract Addresses
+
+| Chain          | StakingRouter                                | SMDiscovery |
+|----------------|----------------------------------------------|-------------|
+| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | TBD         |
+| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | TBD         |
 
 ## Testing
 
-The project uses Foundry's testing framework. Currently, no custom tests are implemented.
+Tests forthcoming. Framework: Foundry with forge-std.
 
 ```bash
-# Run tests (when implemented)
-forge test
-
-# Run specific test
-forge test --match-test testFunctionName
-
-# Run tests with gas reporting
-forge test --gas-report
+forge test                          # Run all tests
+forge test --match-test testName    # Specific test
+forge test --gas-report             # With gas reporting
 ```
-
-## Documentation
-
-- **[CLAUDE.md](./CLAUDE.md)** - Technical documentation and development guidelines
-
-## Related Projects
-
-- [Community Staking Module](https://github.com/lidofinance/community-staking-module) - Main CSM implementation
 
 ## License
 
-This project is licensed under the terms specified in the [LICENSE](./LICENSE) file.
+MIT
