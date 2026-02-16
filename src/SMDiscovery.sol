@@ -27,6 +27,16 @@ struct NodeOperatorProposed {
     uint256 curveId;
 }
 
+struct NodeOperatorInfo {
+    uint256 id;
+    address managerAddress;
+    address rewardAddress;
+    bool extendedManagerPermissions;
+    address proposedManagerAddress;
+    address proposedRewardAddress;
+    uint256 curveId;
+}
+
 enum SearchMode {
     CURRENT_ADDRESSES,
     PROPOSED_ADDRESSES,
@@ -156,6 +166,21 @@ contract SMDiscovery {
                 _offset,
                 _limit
             );
+    }
+
+    /// @notice Get all node operators with full info (current + proposed addresses)
+    /// @param _moduleId Module ID to query
+    /// @param _offset Starting operator index
+    /// @param _limit Maximum number of operators to return
+    function getAllNodeOperators(
+        uint256 _moduleId,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (NodeOperatorInfo[] memory) {
+        (address moduleAddr, address accountingAddr) = _getValidatedCache(
+            _moduleId
+        );
+        return _getAllOperators(moduleAddr, accountingAddr, _offset, _limit);
     }
 
     /// @notice Get depositable validators count for a range of operators
@@ -404,6 +429,50 @@ contract SMDiscovery {
         );
         for (uint256 i = 0; i < resultCount; i++) {
             results[i] = tempResults[i];
+        }
+
+        return results;
+    }
+
+    /// @dev Internal implementation of getAllNodeOperators
+    function _getAllOperators(
+        address _module,
+        address _accountingAddress,
+        uint256 _offset,
+        uint256 _limit
+    ) internal view returns (NodeOperatorInfo[] memory) {
+        if (_limit == 0 || _limit > MAX_BATCH_SIZE) {
+            revert InvalidLimit(_limit, MAX_BATCH_SIZE);
+        }
+
+        IStakingModule module = IStakingModule(_module);
+        uint256 totalOperators = module.getNodeOperatorsCount();
+
+        (uint256 start, uint256 end, bool isEmpty) = _calculateBounds(
+            _offset,
+            _limit,
+            totalOperators
+        );
+        if (isEmpty) return new NodeOperatorInfo[](0);
+
+        uint256 resultCount = end - start;
+        NodeOperatorInfo[] memory results = new NodeOperatorInfo[](resultCount);
+
+        IAccounting accounting = IAccounting(_accountingAddress);
+        for (uint256 i = start; i < end; i++) {
+            IStakingModule.NodeOperator memory operator = module
+                .getNodeOperator(i);
+
+            results[i - start] = NodeOperatorInfo({
+                id: i,
+                managerAddress: operator.managerAddress,
+                rewardAddress: operator.rewardAddress,
+                extendedManagerPermissions: operator
+                    .extendedManagerPermissions,
+                proposedManagerAddress: operator.proposedManagerAddress,
+                proposedRewardAddress: operator.proposedRewardAddress,
+                curveId: accounting.getBondCurveId(i)
+            });
         }
 
         return results;
