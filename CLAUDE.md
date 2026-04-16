@@ -106,7 +106,7 @@ just verify-live
 | Chain          | StakingRouter                                | SMDiscovery                                  |
 |----------------|----------------------------------------------|----------------------------------------------|
 | Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | `0x32893B74064160C626652c2c21A849fDd0bDDFd6` |
-| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | `0x2E04CC1F1dac245f66a5C7c5288Bdd4f7cF0c8b4` |
+| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | `0xC4288A3070D8DA4c7F5DBEC335a9BB31489fDFf1` |
 
 ## Key Technical Details
 
