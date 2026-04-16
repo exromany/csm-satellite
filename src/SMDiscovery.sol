@@ -24,6 +24,7 @@ struct NodeOperatorProposed {
     uint256 id;
     address proposedManagerAddress;
     address proposedRewardAddress;
+    bool extendedManagerPermissions;
     uint256 curveId;
 }
 
@@ -418,6 +419,8 @@ contract SMDiscovery {
                     id: i,
                     proposedManagerAddress: operator.proposedManagerAddress,
                     proposedRewardAddress: operator.proposedRewardAddress,
+                    extendedManagerPermissions: operator
+                        .extendedManagerPermissions,
                     curveId: IAccounting(_accountingAddress).getBondCurveId(i)
                 });
                 resultCount++;
