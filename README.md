@@ -46,7 +46,7 @@ Returns structs with operator IDs, key counts, and next pointers for efficient q
 | Module                          | ID | Contract Address                             |
 |---------------------------------|----|----------------------------------------------|
 | Community Staking Module (CSM)  | 4  | `0x79CEf36D84743222f37765204Bec41E92a93E59d` |
-| Curated Module (CM)             | 5  | TBD                                          |
+| Curated Module (CM)             | 5  | `0x87EB69Ae51317405FD285efD2326a4a11f6173b9` |
 
 ## Deployment
 
