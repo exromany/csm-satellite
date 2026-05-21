@@ -38,6 +38,12 @@ struct NodeOperatorInfo {
     uint256 curveId;
 }
 
+struct NodeOperatorLockedBond {
+    uint256 id;
+    uint128 amount;
+    uint128 until;
+}
+
 enum SearchMode {
     CURRENT_ADDRESSES,
     PROPOSED_ADDRESSES,
@@ -207,6 +213,27 @@ contract SMDiscovery {
         (address moduleAddr, ) = _getValidatedCache(_moduleId);
         return
             _getQueueBatches(moduleAddr, _queuePriority, _cursorIndex, _limit);
+    }
+
+    /// @notice Get Node Operators with non-zero locked bond in a paginated range
+    /// @dev Pagination is over operator-ID space [_offset, _offset+_limit); the returned array contains
+    ///      only operators whose stored locked-bond amount is non-zero. Callers compare `until` against
+    ///      `block.timestamp` to distinguish active vs. expired locks.
+    function getOperatorsWithLockedBond(
+        uint256 _moduleId,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (NodeOperatorLockedBond[] memory) {
+        (address moduleAddr, address accountingAddr) = _getValidatedCache(
+            _moduleId
+        );
+        return
+            _getOperatorsWithLockedBond(
+                moduleAddr,
+                accountingAddr,
+                _offset,
+                _limit
+            );
     }
 
     // === INTERNAL HELPERS ===
@@ -575,5 +602,55 @@ contract SMDiscovery {
         address _module
     ) external view returns (uint256) {
         return ICSModule(_module).QUEUE_LOWEST_PRIORITY();
+    }
+
+    /// @dev Internal implementation of getOperatorsWithLockedBond
+    function _getOperatorsWithLockedBond(
+        address _module,
+        address _accountingAddress,
+        uint256 _offset,
+        uint256 _limit
+    ) internal view returns (NodeOperatorLockedBond[] memory) {
+        if (_limit == 0 || _limit > MAX_BATCH_SIZE) {
+            revert InvalidLimit(_limit, MAX_BATCH_SIZE);
+        }
+
+        IStakingModule module = IStakingModule(_module);
+        uint256 totalOperators = module.getNodeOperatorsCount();
+
+        (uint256 start, uint256 end, bool isEmpty) = _calculateBounds(
+            _offset,
+            _limit,
+            totalOperators
+        );
+        if (isEmpty) return new NodeOperatorLockedBond[](0);
+
+        IAccounting accounting = IAccounting(_accountingAddress);
+        NodeOperatorLockedBond[] memory tempResults = new NodeOperatorLockedBond[](
+            end - start
+        );
+        uint256 resultCount = 0;
+
+        for (uint256 i = start; i < end; i++) {
+            IAccounting.BondLockData memory lock = accounting.getLockedBondInfo(
+                i
+            );
+            if (lock.amount == 0) continue;
+
+            tempResults[resultCount] = NodeOperatorLockedBond({
+                id: i,
+                amount: lock.amount,
+                until: lock.until
+            });
+            resultCount++;
+        }
+
+        NodeOperatorLockedBond[] memory results = new NodeOperatorLockedBond[](
+            resultCount
+        );
+        for (uint256 i = 0; i < resultCount; i++) {
+            results[i] = tempResults[i];
+        }
+        return results;
     }
 }
