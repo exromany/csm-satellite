@@ -119,8 +119,8 @@ just clean          # Clean artifacts
 
 | Chain          | StakingRouter                                | SMDiscovery                                  |
 |----------------|----------------------------------------------|----------------------------------------------|
-| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | `0x32893B74064160C626652c2c21A849fDd0bDDFd6` |
-| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | `0xd4523c0925b2246325dCc1d919f2b84c0bCaCaD9` |
+| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | `0x6a9c16626D64dFe7A185eb6378F8eB901f96281C` |
+| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | `0xb3dFdcE02a83454F38Fd127E6261F7AdcDA86B47` |
 
 ## Testing
 
