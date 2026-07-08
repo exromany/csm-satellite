@@ -4,33 +4,55 @@ Node Operator search and pagination for CSM and Curated Module v2 through a sing
 
 ## Why SMDiscovery?
 
-- **CSM & CMv2 Support**: Works with Community Staking Module (full support) and Curated Module v2 (basic discovery)
-- **Dynamic Routing**: Module addresses resolved via StakingRouter
-- **Stateless & Simple**: No ownership, explicit cache management
-- **Interface Detection**: Gracefully handles CSM-specific features (deposit queues)
-- **Future-Proof**: Compatible with any module implementing IStakingModule
+- **CSM & CMv2 Support**: Works with the Community Staking Module (full support, incl. deposit queue) and Curated Module v2 (discovery only — no queue operations)
+- **Dynamic Routing**: Module and Accounting addresses resolved via StakingRouter and cached on demand
+- **Stateless & Simple**: No ownership, view-only functions, explicit cache management
+- **Interface Detection**: Gracefully handles CSM-specific features (deposit queues) via `try/catch`
+- **Future-Proof**: Compatible with any module implementing `IStakingModule` and exposing `ACCOUNTING()`
 
 ## Architecture
 
 ### Core Contract: SMDiscovery.sol
 
-Provides Node Operator discovery for CSM and CMv2:
+**Cache management**
 
-- `findNodeOperatorsByAddress(moduleId, ...)` - Search by address with pagination
-- `getNodeOperatorsByAddress(moduleId, ...)` - Get operator details by current address
-- `getNodeOperatorsByProposedAddress(moduleId, ...)` - Get operator details by proposed address
-- `updateModuleCache(moduleId)` - Cache module address for efficient queries
+- `updateModuleCache(moduleId)` — resolve the module address from StakingRouter *and* its `ACCOUNTING()` address, then cache both. Permissionless; must be called once per module before any query. Reverts if the module is already cached or doesn't implement `ACCOUNTING()`.
+
+**Discovery (any cached module)**
+
+- `findNodeOperatorsByAddress(moduleId, address, offset, limit, searchMode)` — search a range for operator IDs matching an address
+- `getNodeOperatorsByAddress(moduleId, address, offset, limit)` — operator details matching a current (manager/reward) address
+- `getNodeOperatorsByProposedAddress(moduleId, address, offset, limit)` — operator details matching a proposed (manager/reward) address
+- `getAllNodeOperators(moduleId, offset, limit)` — full info (current + proposed addresses + curve) for every operator in a range
+- `getOperatorsByCurveId(moduleId, curveId, offset, limit)` — operators assigned to a specific bond curve
+- `getOperatorsWithLockedBond(moduleId, offset, limit)` — operators with a non-zero locked bond
+
+> **Pagination note:** `getOperatorsByCurveId` and `getOperatorsWithLockedBond` paginate over operator-ID space `[offset, offset+limit)` and then filter. A returned page may therefore be shorter than `limit` — or empty — even when more matches exist beyond the window. Advance `offset` to keep scanning.
+
+Bond-curve IDs and locked-bond data are read from the module's Accounting contract (cached during `updateModuleCache`).
 
 ### CSM-Specific Features
 
-When querying CSM modules, additional functions available:
+When querying CSM modules, additional functions are available:
 
-- `getNodeOperatorsDepositableValidatorsCount(moduleId, offset, limit)` - Paginated depositable validator counts per operator
-- `getDepositQueueBatches(moduleId, queuePriority, cursorIndex, limit)` - Traverse deposit queue using linked-list with `batch.next()`
+- `getNodeOperatorsDepositableValidatorsCount(moduleId, offset, limit)` — paginated depositable validator counts per operator
+- `getDepositQueueBatches(moduleId, queuePriority, cursorIndex, limit)` — traverse the deposit queue via linked-list, following `batch.next()`
 
-Returns structs with operator IDs, key counts, and next pointers for efficient queue traversal.
+**Note:** These queue operations only work with CSM. Calling them on a module without the CSM queue interface reverts with `ModuleDoesNotSupportQueueOperations`.
 
-**Note:** These queue operations only work with CSM. Calling them on CMv2 will revert with `ModuleDoesNotSupportQueueOperations`.
+### Return Types
+
+| Struct | Fields | Returned by |
+|--------|--------|-------------|
+| `NodeOperatorShort` | `id`, `managerAddress`, `rewardAddress`, `extendedManagerPermissions`, `curveId` | `getNodeOperatorsByAddress`, `getOperatorsByCurveId` |
+| `NodeOperatorProposed` | `id`, `proposedManagerAddress`, `proposedRewardAddress`, `extendedManagerPermissions`, `curveId` | `getNodeOperatorsByProposedAddress` |
+| `NodeOperatorInfo` | `id`, `managerAddress`, `rewardAddress`, `extendedManagerPermissions`, `proposedManagerAddress`, `proposedRewardAddress`, `curveId` | `getAllNodeOperators` |
+| `NodeOperatorLockedBond` | `id`, `amount`, `until` | `getOperatorsWithLockedBond` |
+| `Batch` | packed `uint256` (`nodeOperatorId`, `keysCount`, `next`); read `.next()` for the linked-list pointer | `getDepositQueueBatches` |
+
+`SearchMode` enum: `CURRENT_ADDRESSES`, `PROPOSED_ADDRESSES`, `ALL_ADDRESSES`.
+
+> `NodeOperatorLockedBond.until` is the timestamp the lock is retained until; compare it against `block.timestamp` to distinguish active from expired locks (`amount` may remain non-zero after expiry).
 
 ### Module IDs
 
@@ -79,11 +101,10 @@ CHAIN=mainnet RPC_URL=<your-rpc> just verify-live
 // Deploy SMDiscovery
 SMDiscovery discovery = new SMDiscovery(stakingRouterAddress);
 
-// Initialize cache for modules you need
+// Initialize cache for each module you need (resolves module + Accounting)
 discovery.updateModuleCache(3); // CSM (mainnet)
-discovery.updateModuleCache(4); // Curated Module (mainnet)
 
-// Search for Node Operators by address
+// Search for Node Operator IDs by address
 uint256[] memory operatorIds = discovery.findNodeOperatorsByAddress(
     3,                                      // moduleId (CSM on mainnet)
     0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb,
@@ -95,14 +116,21 @@ uint256[] memory operatorIds = discovery.findNodeOperatorsByAddress(
 // Get operator details by current address
 SMDiscovery.NodeOperatorShort[] memory operators =
     discovery.getNodeOperatorsByAddress(3, targetAddress, 0, 100);
-// Returns: id, managerAddress, rewardAddress, extendedManagerPermissions, curveId
 
-// Get CSM-specific data (deposit queue)
-SMDiscovery.DepositQueueBatchInfo[] memory batches =
+// Filter operators by bond curve
+SMDiscovery.NodeOperatorShort[] memory onCurve =
+    discovery.getOperatorsByCurveId(3, 1 /* curveId */, 0, 100);
+
+// Find operators with a locked bond
+SMDiscovery.NodeOperatorLockedBond[] memory locked =
+    discovery.getOperatorsWithLockedBond(3, 0, 100);
+
+// Get CSM-specific data (deposit queue); Batch is imported from IBatch.sol
+Batch[] memory batches =
     discovery.getDepositQueueBatches(
         3,          // moduleId
         0,          // queuePriority (0 = highest priority)
-        0,          // cursorIndex (start of queue)
+        0,          // cursorIndex (0 = start from queue head)
         10          // limit
     );
 ```
