@@ -236,6 +236,28 @@ contract SMDiscovery {
             );
     }
 
+    /// @notice Get Node Operators assigned to a specific bond curve in a paginated range
+    /// @dev Pagination is over operator-ID space [_offset, _offset+_limit); the returned array
+    ///      contains only operators whose bond curve ID equals _curveId.
+    function getOperatorsByCurveId(
+        uint256 _moduleId,
+        uint256 _curveId,
+        uint256 _offset,
+        uint256 _limit
+    ) external view returns (NodeOperatorShort[] memory) {
+        (address moduleAddr, address accountingAddr) = _getValidatedCache(
+            _moduleId
+        );
+        return
+            _getOperatorsByCurveId(
+                moduleAddr,
+                accountingAddr,
+                _curveId,
+                _offset,
+                _limit
+            );
+    }
+
     // === INTERNAL HELPERS ===
 
     /// @dev Validates address (non-zero) and limit (0 < limit <= MAX_BATCH_SIZE)
@@ -651,6 +673,60 @@ contract SMDiscovery {
         for (uint256 i = 0; i < resultCount; i++) {
             results[i] = tempResults[i];
         }
+        return results;
+    }
+
+    /// @dev Internal implementation of getOperatorsByCurveId
+    function _getOperatorsByCurveId(
+        address _module,
+        address _accountingAddress,
+        uint256 _curveId,
+        uint256 _offset,
+        uint256 _limit
+    ) internal view returns (NodeOperatorShort[] memory) {
+        if (_limit == 0 || _limit > MAX_BATCH_SIZE) {
+            revert InvalidLimit(_limit, MAX_BATCH_SIZE);
+        }
+
+        IStakingModule module = IStakingModule(_module);
+        uint256 totalOperators = module.getNodeOperatorsCount();
+
+        (uint256 start, uint256 end, bool isEmpty) = _calculateBounds(
+            _offset,
+            _limit,
+            totalOperators
+        );
+        if (isEmpty) return new NodeOperatorShort[](0);
+
+        IAccounting accounting = IAccounting(_accountingAddress);
+        NodeOperatorShort[] memory tempResults = new NodeOperatorShort[](
+            end - start
+        );
+        uint256 resultCount = 0;
+
+        for (uint256 i = start; i < end; i++) {
+            if (accounting.getBondCurveId(i) != _curveId) continue;
+
+            IStakingModule.NodeOperatorManagementProperties
+                memory operator = module.getNodeOperatorManagementProperties(i);
+
+            tempResults[resultCount] = NodeOperatorShort({
+                id: i,
+                managerAddress: operator.managerAddress,
+                rewardAddress: operator.rewardAddress,
+                extendedManagerPermissions: operator.extendedManagerPermissions,
+                curveId: _curveId
+            });
+            resultCount++;
+        }
+
+        NodeOperatorShort[] memory results = new NodeOperatorShort[](
+            resultCount
+        );
+        for (uint256 i = 0; i < resultCount; i++) {
+            results[i] = tempResults[i];
+        }
+
         return results;
     }
 }
