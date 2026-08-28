@@ -79,15 +79,16 @@ here, since there is no initializer to call and the admin is set atomically in
 
 ## Deploy and upgrade scripts
 
-`DeployBase.s.sol` gains a `proxyAdmin` field read from `vm.envAddress("PROXY_ADMIN")`. The
-value is required — there is no fallback to `msg.sender`, so an admin key is never assigned
-implicitly. Local anvil runs (`just deploy`) therefore need `PROXY_ADMIN` set in `.env`, which
-`just`'s `set dotenv-load` already picks up. The script deploys the implementation, then the proxy, then initialises the
-module cache *through the proxy address*.
+`DeployBase.s.sol` gains a `proxyAdmin` field read via `vm.envOr("PROXY_ADMIN", address(0))`
+and rejected with `ProxyAdminNotSet()` if still zero. There is no fallback to `msg.sender`, so
+an admin key is never assigned implicitly. Local anvil runs (`just deploy`) therefore need
+`PROXY_ADMIN` set in `.env`, which `just`'s `set dotenv-load` already picks up. The script
+deploys the implementation, then the proxy, then initialises the module cache *through the
+proxy address*.
 
 New `UpgradeBase.s.sol` with `UpgradeMainnet` / `UpgradeHoodi` subclasses, reading the proxy
-address from `PROXY_ADDRESS` rather than hardcoding it per chain. It deploys only a new
-implementation, then branches:
+address via the same `vm.envOr(..., address(0))` / `ProxyAddressNotSet()` pattern rather than
+hardcoding it per chain. It deploys only a new implementation, then branches:
 
 - caller is the proxy admin (hoodi, team EOA) — broadcast `proxy__upgradeTo` directly;
 - caller is not (mainnet, multisig) — log the target and the `proxy__upgradeTo` calldata.
