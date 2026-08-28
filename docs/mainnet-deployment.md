@@ -175,9 +175,31 @@ forge verify-check <GUID> --chain 1 --verifier etherscan \
   --etherscan-api-key $ETHERSCAN_API_KEY
 ```
 
-Expect `Pass - Verified` for both. Then, on the proxy's Etherscan page, use
-**More Options → Is this a proxy?** so the explorer renders the implementation ABI against
-the proxy address. Cosmetic, but it is what makes the contract usable from Etherscan's UI.
+Expect `Pass - Verified` for both.
+
+After both contracts verify, link them so Etherscan renders the implementation's ABI on the
+proxy page. This is an API call, not a browser step:
+
+```bash
+GUID=$(curl -s -X POST "https://api.etherscan.io/v2/api?chainid=1" \
+  -d "module=contract" -d "action=verifyproxycontract" \
+  -d "address=$PROXY" -d "expectedimplementation=$IMPL" \
+  -d "apikey=$ETHERSCAN_API_KEY" | jq -r .result)
+
+curl -s "https://api.etherscan.io/v2/api?chainid=1&module=contract&action=checkproxyverification&guid=$GUID&apikey=$ETHERSCAN_API_KEY"
+```
+
+Expect `...implementation contract is found at 0x... and is successfully updated.`
+`Pending in queue` just means retry the check.
+
+Etherscan reads the ERC-1967 slot itself; `expectedimplementation` makes it assert against
+the address you claim, so a mismatch fails loudly instead of silently linking the wrong
+contract. Purely explorer metadata — no transaction, no on-chain effect — but without it
+the proxy page exposes only `proxy__*` and callers get no Read/Write tabs for the discovery
+functions. **Re-run it after every upgrade**, since the mapping names a specific
+implementation.
+
+Blockscout needs nothing here: it detects `eip1967` from the storage slot on its own.
 
 ## 6. On-chain checks
 
