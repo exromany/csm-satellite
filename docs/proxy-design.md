@@ -55,7 +55,7 @@ field order or types.
 ## Components
 
 ```
-lib/openzeppelin-contracts         new submodule, pinned tag
+lib/openzeppelin-contracts         new submodule, pinned to v5.4.0 (CSM's own pin)
 src/lib/proxy/OssifiableProxy.sol  vendored verbatim from lidofinance/community-staking-module
 src/SMDiscovery.sol                unchanged
 remappings.txt                     @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
@@ -63,6 +63,14 @@ remappings.txt                     @openzeppelin/contracts/=lib/openzeppelin-con
 
 The exact `proxy__*` signatures are taken from the vendored source; confirming them against
 that source is the first implementation step.
+
+The OZ version pin is load-bearing, not incidental. OZ v5.6.0 added an
+`ERC1967ProxyUninitialized` guard that reverts when `ERC1967Proxy` is constructed with empty
+`_data`. This design passes empty `_data` on purpose, because `SMDiscovery` has no initializer
+and must not gain one, so any OZ >= 5.6.0 breaks construction outright. The guard exists to stop
+an attacker front-running an uninitialized proxy's `initialize()`; that window does not exist
+here, since there is no initializer to call and the admin is set atomically in
+`OssifiableProxy`'s constructor. Pin to v5.4.0, the tag CSM pins.
 
 ## Deploy and upgrade scripts
 

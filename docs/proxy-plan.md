@@ -4,18 +4,23 @@
 
 **Goal:** Put `SMDiscovery` behind Lido's `OssifiableProxy` so its address survives future releases.
 
-**Architecture:** Vendor `OssifiableProxy` from CSM over an OpenZeppelin v5.7.0 submodule. `SMDiscovery.sol` itself is not modified — it needs no initializer because `STAKING_ROUTER` is `immutable` (lives in implementation bytecode, resolves through `delegatecall`) and `moduleCache` is filled by the permissionless `updateModuleCache()`. Deploy and upgrade scripts read the proxy admin and proxy address from environment variables.
+**Architecture:** Vendor `OssifiableProxy` from CSM over an OpenZeppelin v5.4.0 submodule. `SMDiscovery.sol` itself is not modified — it needs no initializer because `STAKING_ROUTER` is `immutable` (lives in implementation bytecode, resolves through `delegatecall`) and `moduleCache` is filled by the permissionless `updateModuleCache()`. Deploy and upgrade scripts read the proxy admin and proxy address from environment variables.
 
-**Tech Stack:** Solidity 0.8.24, Foundry, OpenZeppelin Contracts v5.7.0, Just.
+**Tech Stack:** Solidity 0.8.24, Foundry, OpenZeppelin Contracts v5.4.0, Just.
 
 **Spec:** `docs/proxy-design.md`
 
 ## Global Constraints
 
-- Solidity pragma is exactly `0.8.24` for every file in `src/` and `script/`. The vendored proxy ships with `0.8.33` and MUST be relaxed to `0.8.24`; OZ v5.7.0's strictest pragma is `^0.8.22`, so this compiles.
-- OpenZeppelin pinned at tag `v5.7.0`. Do not use a floating branch.
+- Solidity pragma is exactly `0.8.24` for every file in `src/` and `script/`. The vendored proxy ships with `0.8.33` and MUST be relaxed to `0.8.24`; OZ v5.4.0's strictest pragma is `^0.8.22`, so this compiles.
+- OpenZeppelin pinned at tag `v5.4.0` — the exact version CSM pins. **Do not bump this.**
+  OZ `v5.6.0` added an `ERC1967ProxyUninitialized` guard that reverts when `ERC1967Proxy` is
+  constructed with empty `_data`, unless `_unsafeAllowUninitialized()` is overridden. This design
+  passes empty `_data` on purpose (SMDiscovery has no initializer and must not gain one), so any
+  OZ >= 5.6.0 breaks construction. Pinning to CSM's tag also keeps the vendored file identical to
+  the audited artifact. Do not use a floating branch.
 - Remapping is exactly `@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/`.
-- The vendored `OssifiableProxy.sol` keeps its original `GPL-3.0` SPDX header and Lido copyright line. New files follow the existing test/script convention: `// SPDX-License-Identifier: MIT`.
+- The repo is GPL-3.0 (settled in commit `e9ad76c`: `LICENSE`, README and every `.sol` header now agree). The vendored `OssifiableProxy.sol` keeps its original GPL-3.0 header and Lido copyright line. Every new file uses `// SPDX-License-Identifier: GPL-3.0`.
 - `SMDiscovery.sol` MUST NOT be modified by any task in this plan. If a task appears to require changing it, stop and report.
 - `moduleCache` stays at storage slot 0. New state variables may only be appended.
 - Proxy mechanics are tested with local mocks, not forks. Only `QueueDetection.t.sol` uses a fork, and it keeps its existing skip-when-`RPC_URL`-unset behaviour.
@@ -29,7 +34,7 @@ This plan delivers code, tests, and documentation structure. Actually broadcasti
 ### Task 1: Vendor OssifiableProxy and prove immutables survive delegatecall
 
 **Files:**
-- Create: `lib/openzeppelin-contracts` (submodule, tag `v5.7.0`)
+- Create: `lib/openzeppelin-contracts` (submodule, tag `v5.4.0`)
 - Modify: `remappings.txt` (currently empty)
 - Create: `src/lib/proxy/OssifiableProxy.sol`
 - Create: `test/mocks/StakingRouterMock.sol`
@@ -46,15 +51,15 @@ This plan delivers code, tests, and documentation structure. Actually broadcasti
   - `StakingModuleMock(address accounting_)`
   - Note: `OssifiableProxy` declares `receive() external payable`, so casting an address to it requires `OssifiableProxy(payable(addr))`.
 
-- [ ] **Step 1: Add the OpenZeppelin submodule pinned to v5.7.0**
+- [ ] **Step 1: Add the OpenZeppelin submodule pinned to v5.4.0**
 
 ```bash
 git submodule add https://github.com/OpenZeppelin/openzeppelin-contracts lib/openzeppelin-contracts
-git -C lib/openzeppelin-contracts checkout v5.7.0
+git -C lib/openzeppelin-contracts checkout v5.4.0
 git -C lib/openzeppelin-contracts submodule update --init --recursive
 ```
 
-Verify the pin resolved: `git -C lib/openzeppelin-contracts describe --tags` must print `v5.7.0`.
+Verify the pin resolved: `git -C lib/openzeppelin-contracts describe --tags` must print `v5.4.0`.
 
 - [ ] **Step 2: Write the remapping**
 
@@ -69,7 +74,7 @@ Overwrite `remappings.txt` with exactly:
 `test/mocks/StakingRouterMock.sol`:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {IStakingRouter} from "../../src/interfaces/IStakingRouter.sol";
@@ -93,7 +98,7 @@ contract StakingRouterMock {
 `test/mocks/StakingModuleMock.sol`:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 contract StakingModuleMock {
@@ -115,7 +120,7 @@ contract StakingModuleMock {
 `test/Proxy.t.sol`:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
@@ -384,7 +389,7 @@ Expected: compilation failure — `Source "test/mocks/SMDiscoveryV2Mock.sol" not
 `test/mocks/SMDiscoveryV2Mock.sol`. Note it appends only a `constant` (no storage), which is the append-only pattern the design requires.
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {SMDiscovery} from "../../src/SMDiscovery.sol";
@@ -429,7 +434,7 @@ git commit --no-gpg-sign -m "test: cover cache preservation, admin control and o
 `test/SelectorCollision.t.sol`:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
@@ -501,7 +506,7 @@ Expected: FAIL with `selector collision: proxy__getAdmin() vs proxy__getAdmin()`
 Rewrite `test/QueueDetection.t.sol` as follows. The behavioural assertions are unchanged; they now run against both instances. This matters because `_tryGetQueuePriority` performs a `this.`-prefixed external self-call, which behind a proxy re-enters the proxy and delegatecalls back.
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
@@ -627,7 +632,7 @@ git commit --no-gpg-sign -m "test: guard selector shadowing, run queue detection
 `test/DeployScript.t.sol`:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
@@ -694,7 +699,7 @@ Expected: compilation failure — `DeployBase.ProxyAdminNotSet` and members `pro
 Replace the whole body of `script/DeployBase.s.sol` with:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
@@ -808,7 +813,7 @@ The proxy address is read from `PROXY_ADDRESS` rather than hardcoded, matching t
 `test/UpgradeScript.t.sol`:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
@@ -884,7 +889,7 @@ Expected: compilation failure — `script/UpgradeHoodi.s.sol` not found.
 `script/UpgradeBase.s.sol`:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
@@ -961,7 +966,7 @@ contract UpgradeBase is Script {
 `script/UpgradeHoodi.s.sol`:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {UpgradeBase} from "./UpgradeBase.s.sol";
@@ -980,7 +985,7 @@ contract UpgradeHoodi is UpgradeBase {
 `script/UpgradeMainnet.s.sol`:
 
 ```solidity
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
 import {UpgradeBase} from "./UpgradeBase.s.sol";
@@ -1239,7 +1244,7 @@ And append this to the same section:
 ```markdown
 The upstream file is GPL-3.0. This repository is already GPL-3.0 (`LICENSE`, and
 `src/interfaces/IStakingRouter.sol` carries the same header), so vendoring raises no
-licensing question. OpenZeppelin is pinned at `v5.7.0`, whose strictest pragma is `^0.8.22`.
+licensing question. OpenZeppelin is pinned at `v5.4.0`, whose strictest pragma is `^0.8.22`.
 ```
 
 Also update the "Deploy and upgrade scripts" section: the proxy address is read from
