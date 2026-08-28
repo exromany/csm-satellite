@@ -25,7 +25,9 @@ contract DeployScriptTest is Test {
         }
     }
 
-    function test_deploy_putsDiscoveryBehindProxyAndSeedsCache() external {
+    /// @dev Both cases live in one test because vm.setEnv mutates process-global state and forge
+    ///      runs tests in parallel; exactly one test function may own PROXY_ADMIN.
+    function test_deploy_putsDiscoveryBehindProxyAndRequiresAdmin() external {
         vm.setEnv("PROXY_ADMIN", vm.toString(PROXY_ADMIN));
 
         DeployHoodi script = new DeployHoodi();
@@ -42,13 +44,11 @@ contract DeployScriptTest is Test {
             CSM_MODULE_ID
         );
         assertTrue(moduleAddress != address(0), "cache not seeded");
-    }
 
-    function test_deploy_revertsWhenProxyAdminUnset() external {
         vm.setEnv("PROXY_ADMIN", vm.toString(address(0)));
 
-        DeployHoodi script = new DeployHoodi();
+        DeployHoodi unsetScript = new DeployHoodi();
         vm.expectRevert(DeployBase.ProxyAdminNotSet.selector);
-        script.run();
+        unsetScript.run();
     }
 }
