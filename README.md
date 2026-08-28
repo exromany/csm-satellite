@@ -61,7 +61,7 @@ When querying CSM modules, additional functions are available:
 | Module                          | ID | Contract Address                             |
 |---------------------------------|----|----------------------------------------------|
 | Community Staking Module (CSM)  | 3  | `0xdA7dE2ECdDfccC6c3AF10108Db212ACBBf9EA83F` |
-| Curated Module (CM)             | 4  | TBD                                          |
+| Curated Module (CM)             | 4  | `0xDa5F930cE326EB5205085D66c72A4E79d60cB8C1` |
 
 #### Hoodi Testnet (Chain ID: 560048)
 
@@ -69,8 +69,13 @@ When querying CSM modules, additional functions are available:
 |---------------------------------|----|----------------------------------------------|
 | Community Staking Module (CSM)  | 4  | `0x79CEf36D84743222f37765204Bec41E92a93E59d` |
 | Curated Module (CM)             | 5  | `0x87EB69Ae51317405FD285efD2326a4a11f6173b9` |
+| Community Staking 0x02 (CSM v2) | 6  | `0xbb7dd81FAC80f3Effa10eA8b973c15AE65a4CAf9` |
 
 ## Deployment
+
+For mainnet, follow [docs/mainnet-deployment.md](docs/mainnet-deployment.md) — a step-by-step
+runbook covering pre-flight, dry run, broadcast, Etherscan verification of both contracts,
+the multisig upgrade handoff, and ossification.
 
 ### Local Fork
 ```bash
@@ -167,10 +172,14 @@ just clean          # Clean artifacts
 
 ## Contract Addresses
 
-| Chain          | StakingRouter                                | SMDiscovery (proxy)     | Implementation |
-|----------------|----------------------------------------------|-------------------------|----------------|
-| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | pending proxy migration | pending        |
-| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | pending proxy migration | pending        |
+| Chain          | StakingRouter                                | SMDiscovery (proxy)                          | Implementation                               |
+|----------------|----------------------------------------------|----------------------------------------------|----------------------------------------------|
+| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | pending proxy migration                      | pending                                      |
+| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | `0x9f869227c456feD9A50e272224E438b0e79c6387` | `0xB8929265b77c5Eb6F66A607D9e4002A58142A8bD` |
+
+Consumers should use the **proxy** address; the implementation is listed only for explorer
+verification and changes on every release. Hoodi proxy admin: `0x937B9327225f1756f9bb807C0f2Db37bDA002F30` (deployer EOA).
+Mainnet will use a multisig.
 
 Pre-proxy deployments, deprecated once the proxies are live and kept only for reference:
 mainnet `0x6a9c16626D64dFe7A185eb6378F8eB901f96281C`,
