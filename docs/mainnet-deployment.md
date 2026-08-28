@@ -19,28 +19,28 @@ Do not run steps 3+ without an explicit go-ahead.**
 | Account flags | `--account acc2 --sender 0x3e8f6e55601bef766634e43b26c99c4c01f71863` |
 | Scripts | `DeployMainnet` / `UpgradeMainnet` |
 | Artifacts | `artifacts/mainnet/transactions.json` |
+| **Deployed proxy** | `0x106b2E4506f3b3D0A6Dfb41bCB4A64C10Fe32b92` |
+| **Implementation** | `0x51E161a6989867E9EE640dFcCE15b9A983936d63` |
+| **Proxy admin** | `0x3E8f6E55601BEF766634e43B26c99C4C01F71863` (deployer EOA) |
 
 The mainnet keystore is **encrypted** — never pass `--password=""` (that is a Hoodi-only
 convenience). You will be prompted for the password.
 
-## Open decisions before a first deploy
+## Current state
 
-Two things must be settled explicitly; neither has a safe default.
+Mainnet is deployed. The values are in the table above. Two things that were open at first
+deploy, and where they landed:
 
-1. **Proxy admin.** `PROXY_ADMIN` is required and must not be zero. On Hoodi it is the
-   deployer EOA. **On mainnet it should be a multisig**, not an EOA. The admin can replace
-   the implementation and therefore change what every consumer reads, so it carries the
-   same trust weight as the contract itself. Decide the address before step 3.
+1. **Proxy admin — the deployer EOA**, not a multisig. The admin can replace the
+   implementation and therefore change what every consumer reads, so it carries the same
+   trust weight as the contract itself. Moving it to a multisig is a single
+   `proxy__changeAdmin` call and needs no redeploy; until then, treat that key accordingly.
 
-2. **Which modules to seed.** `script/DeployMainnet.s.sol` currently enables **only CSM
-   (id 3)**; CM (id 4) is still commented out from when it was unregistered. It is
-   registered now, at the address in the table above, and it exposes a working
-   `ACCOUNTING()`, so it can be cached. Uncomment it if CM discovery is wanted at launch —
-   otherwise queries against module 4 revert `ModuleCacheNotInitialized` until someone
-   calls `updateModuleCache(4)`.
+2. **Modules 3 (CSM) and 4 (CM) are both seeded.** CM was commented out in
+   `DeployMainnet.s.sol` while it was unregistered; it is registered now and enabled.
 
-   Caching a module never requires an upgrade: `updateModuleCache` is permissionless and
-   can be called any time after deployment.
+Caching a module never requires an upgrade — `updateModuleCache` is permissionless and can
+be called at any time.
 
 ---
 
@@ -81,7 +81,7 @@ Export the admin (it is deliberately not in `.env`; shell environment beats `jus
 dotenv, so an exported value always wins):
 
 ```bash
-export PROXY_ADMIN=<multisig address>
+export PROXY_ADMIN=<admin address — a multisig for any new production deploy>
 ```
 
 Finally, run the test suite. `test/StorageLayout.t.sol` and `test/SelectorCollision.t.sol`
@@ -110,6 +110,14 @@ that module is not registered — stop and resolve it. If the dry run fails at a
 
 Use `deploy-live-no-confirm`; the `deploy-live` recipe wraps `[confirm(...)]`, which needs
 interactive stdin and will not run non-interactively.
+
+**The mainnet keystore prompts for a password and needs a real TTY.** Run this from an
+actual terminal. Anywhere stdin is not a terminal — an agent shell, CI, a pipe — forge
+fails with `Error: Device not configured (os error 6)` *after* simulating and writing
+`run-latest.json`, but **before** signing. That failure mode is safe (nothing is
+broadcast; check that `ONCHAIN EXECUTION COMPLETE` is absent and the deployer's nonce is
+unchanged), but it is easy to misread as a partial deploy. `--password-file <path>`
+(env `ETH_PASSWORD`) is the non-interactive alternative.
 
 ```bash
 TERM=xterm-256color just deploy-live-no-confirm \
@@ -231,9 +239,19 @@ TERM=xterm-256color just upgrade-live-dry --account acc2 --sender 0x3e8f6e55601b
 TERM=xterm-256color just upgrade-live-no-confirm --etherscan-api-key=$ETHERSCAN_API_KEY --account acc2 --sender 0x3e8f6e55601bef766634e43b26c99c4c01f71863
 ```
 
-Because the mainnet admin is a multisig and the deployer is not, the script takes its
-**non-admin branch**: it deploys the new implementation and then prints the transaction for
-the admin to submit, rather than upgrading itself.
+The script branches on whether the broadcaster equals the proxy admin.
+
+**Today the admin IS the deployer**, so the run takes the admin branch and upgrades in one
+step:
+
+```
+Upgraded proxy: 0x106b2E4506f3b3D0A6Dfb41bCB4A64C10Fe32b92
+New implementation: 0x...
+```
+
+**Once the admin moves to a multisig**, the same command takes the non-admin branch
+instead: it still deploys the new implementation, then prints the transaction for the
+admin to submit rather than upgrading itself.
 
 ```
 Broadcaster is not the proxy admin, not upgrading.
@@ -246,14 +264,14 @@ This split is deliberate. The expensive, failure-prone step (deploying and verif
 implementation) happens without admin keys; the multisig then signs one cheap call against
 bytecode already on chain and independently verifiable.
 
-Before handing the payload to signers:
+Before handing that payload to signers:
 
 - confirm the selector: `cast sig 'proxy__upgradeTo(address)'` → `0x3ebdd0eb`
 - confirm the trailing 32 bytes decode to the implementation address you just verified
 - verify that implementation on Etherscan (step 5) **first**, so signers can read the code
   they are about to point the proxy at
 
-After the multisig executes:
+After the upgrade lands (directly, or once the multisig executes):
 
 ```bash
 cast call $PROXY_ADDRESS "proxy__getImplementation()(address)" --rpc-url=$RPC_URL  # → new impl

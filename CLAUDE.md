@@ -106,14 +106,17 @@ just verify-live
 
 | Chain          | StakingRouter                                | SMDiscovery (proxy)                          | Implementation                               |
 |----------------|----------------------------------------------|----------------------------------------------|----------------------------------------------|
-| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | pending proxy migration                      | pending                                      |
+| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | `0x106b2E4506f3b3D0A6Dfb41bCB4A64C10Fe32b92` | `0x51E161a6989867E9EE640dFcCE15b9A983936d63` |
 | Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | `0x9f869227c456feD9A50e272224E438b0e79c6387` | `0xB8929265b77c5Eb6F66A607D9e4002A58142A8bD` |
 
 Consumers should use the **proxy** address; the implementation is listed only for explorer
-verification and changes on every release. Hoodi proxy admin: `0x937B9327225f1756f9bb807C0f2Db37bDA002F30`
-(deployer EOA). Mainnet will use a multisig.
+verification and changes on every release.
 
-Pre-proxy deployments, deprecated once the proxies are live and kept only for reference:
+Proxy admins are currently the deploying EOAs — mainnet `0x3E8f6E55601BEF766634e43B26c99C4C01F71863`,
+hoodi `0x937B9327225f1756f9bb807C0f2Db37bDA002F30`. Moving the mainnet admin to a multisig
+is a `proxy__changeAdmin` call and does not require a redeploy.
+
+Pre-proxy deployments, now superseded by the proxies above and kept only for reference:
 mainnet `0x6a9c16626D64dFe7A185eb6378F8eB901f96281C`,
 hoodi `0xb3dFdcE02a83454F38Fd127E6261F7AdcDA86B47`.
 
