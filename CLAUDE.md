@@ -124,7 +124,7 @@ discovery.findNodeOperatorsByAddress(moduleId, address, offset, limit, mode);
 
 SMDiscovery gracefully handles module-specific operations:
 
-- Tries to cast to ICSModule for queue operations
+- Probes `depositQueuePointers()` (CSM-only) via `try/catch`; the priority bound itself is read from `PARAMETERS_REGISTRY().QUEUE_LOWEST_PRIORITY()`, since non-CSM modules may also expose a registry
 - If successful: queue operations available
 - If fails: reverts with `ModuleDoesNotSupportQueueOperations`
 
