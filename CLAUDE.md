@@ -178,8 +178,8 @@ Artifacts stored in `./artifacts/latest/` with transactions in `transactions.jso
 
 ## Testing
 
-**Current Status**: Proxy mechanics covered by local-mock tests; queue detection covered by
-a Hoodi fork test that skips when `RPC_URL` is unset.
+**Current Status**: Proxy mechanics covered by local-mock tests; queue detection and the
+deploy script are covered by Hoodi fork tests that skip when `RPC_URL` is unset.
 
 | File | Covers |
 |------|--------|

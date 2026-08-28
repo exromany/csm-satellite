@@ -175,7 +175,7 @@ hoodi `0xb3dFdcE02a83454F38Fd127E6261F7AdcDA86B47`.
 
 ## Testing
 
-Tests forthcoming. Framework: Foundry with forge-std.
+14 tests across 5 files cover proxy mechanics, selector collisions, queue detection, and the deploy/upgrade scripts — see `CLAUDE.md`'s Testing section for the breakdown. Framework: Foundry with forge-std.
 
 ```bash
 forge test                          # Run all tests

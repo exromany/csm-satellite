@@ -67,7 +67,7 @@ that source is the first implementation step.
 
 The upstream file is GPL-3.0. This repository is already GPL-3.0 (`LICENSE`, and
 `src/interfaces/IStakingRouter.sol` carries the same header), so vendoring raises no
-licensing question. OpenZeppelin is pinned at `v5.4.0`, whose strictest pragma is `^0.8.22`.
+licensing question. OpenZeppelin is pinned at `v5.4.0`; other files in the package go up to `^0.8.27`, but among the files this proxy actually imports (`ERC1967Proxy.sol`, `ERC1967Utils.sol`, `Proxy.sol`, `StorageSlot.sol`, `IERC1967.sol`) the strictest pragma is `^0.8.22`.
 
 The OZ version pin is load-bearing, not incidental. OZ v5.6.0 added an
 `ERC1967ProxyUninitialized` guard that reverts when `ERC1967Proxy` is constructed with empty
