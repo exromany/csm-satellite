@@ -56,7 +56,16 @@ contract UpgradeScriptTest is Test {
             "expected a freshly deployed implementation"
         );
 
-        // 3. An unset PROXY_ADDRESS must revert before anything is broadcast.
+        // 3. An ossified proxy must revert before deploying anything.
+        vm.setEnv("PROXY_ADDRESS", vm.toString(address(proxy)));
+        vm.prank(address(0xBEEF));
+        proxy.proxy__ossify();
+
+        UpgradeHoodi ossifiedRun = new UpgradeHoodi();
+        vm.expectRevert(UpgradeBase.ProxyIsOssified.selector);
+        ossifiedRun.run();
+
+        // 4. An unset PROXY_ADDRESS must revert before anything is broadcast.
         vm.setEnv("PROXY_ADDRESS", vm.toString(address(0)));
 
         UpgradeHoodi unsetRun = new UpgradeHoodi();

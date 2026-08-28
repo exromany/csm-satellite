@@ -508,7 +508,7 @@ Expected: FAIL with `selector collision: proxy__getAdmin() vs proxy__getAdmin()`
 
 - [ ] **Step 4: Parameterise QueueDetection over direct and proxied instances**
 
-Rewrite `test/QueueDetection.t.sol` as follows. The behavioural assertions are unchanged; they now run against both instances. This matters because `_tryGetQueuePriority` performs a `this.`-prefixed external self-call, which behind a proxy re-enters the proxy and delegatecalls back.
+Rewrite `test/QueueDetection.t.sol` as follows. The behavioural assertions are unchanged; they now run against both instances. This matters because `_tryGetMaxQueuePriority` performs a `this.`-prefixed external self-call, which behind a proxy re-enters the proxy and delegatecalls back.
 
 ```solidity
 // SPDX-License-Identifier: GPL-3.0
@@ -519,7 +519,7 @@ import "../src/SMDiscovery.sol";
 import {Batch} from "../src/interfaces/IBatch.sol";
 import {OssifiableProxy} from "../src/lib/proxy/OssifiableProxy.sol";
 
-/// @dev Regression test for the CSM queue-detection probe (see _tryGetQueuePriority).
+/// @dev Regression test for the CSM queue-detection probe (see _tryGetMaxQueuePriority).
 ///      Runs against a pinned Hoodi fork; skipped when RPC_URL is unset or points elsewhere.
 ///      Each case runs against both a direct and a proxied instance.
 contract QueueDetectionTest is Test {

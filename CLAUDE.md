@@ -185,6 +185,7 @@ deploy script are covered by Hoodi fork tests that skip when `RPC_URL` is unset.
 |------|--------|
 | `test/Proxy.t.sol` | immutables through delegatecall, cache preservation across upgrade, admin control, ossification |
 | `test/SelectorCollision.t.sol` | no proxy selector shadows an implementation method |
+| `test/StorageLayout.t.sol` | `moduleCache` is the only storage variable, at slot 0 |
 | `test/QueueDetection.t.sol` | CSM queue detection, direct and proxied (fork) |
 | `test/DeployScript.t.sol` | deploy script wires proxy and seeds cache (fork) |
 | `test/UpgradeScript.t.sol` | upgrade script admin/non-admin branches |

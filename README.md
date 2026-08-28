@@ -95,8 +95,9 @@ CHAIN=mainnet RPC_URL=<your-rpc> just verify-live
 implementation and leaves the address alone.
 
 ```bash
-# Dry run (recommended first)
-CHAIN=mainnet PROXY_ADDRESS=<proxy> just upgrade-live-dry
+# Dry run (recommended first) — pass --sender <admin> to exercise the upgrade path,
+# since forge script's default sender is never the proxy admin
+CHAIN=mainnet PROXY_ADDRESS=<proxy> just upgrade-live-dry --sender <admin>
 
 # Deploy the new implementation and upgrade
 CHAIN=mainnet RPC_URL=<your-rpc> PROXY_ADDRESS=<proxy> just upgrade-live
@@ -104,21 +105,23 @@ CHAIN=mainnet RPC_URL=<your-rpc> PROXY_ADDRESS=<proxy> just upgrade-live
 
 If the broadcaster is the proxy admin, the upgrade is sent directly. Otherwise the
 script deploys the implementation and logs the `proxy__upgradeTo` calldata for the
-admin multisig to submit.
+admin multisig to submit. `STAKING_ROUTER` is read back from the existing proxy, so the
+new implementation is always deployed against the router already in use — it is never
+taken from a hardcoded constant.
 
 ### Environment Variables
 
 - `CHAIN`: Target chain (`mainnet`, `hoodi`) - defaults to `mainnet`
 - `RPC_URL`: RPC endpoint for live deployments
 - `ANVIL_IP_ADDR`: Anvil host address (defaults to `127.0.0.1`)
-- `PROXY_ADMIN`: Admin address for the OssifiableProxy - required by `just deploy-live`
+- `PROXY_ADMIN`: Admin address for the OssifiableProxy - required by `just deploy` (including local Anvil, since `set dotenv-load` applies to both)
 - `PROXY_ADDRESS`: Existing proxy to upgrade - required by `just upgrade-live`
 
 ## Usage Example
 
 ```solidity
-// Deploy SMDiscovery
-SMDiscovery discovery = new SMDiscovery(stakingRouterAddress);
+// SMDiscovery sits behind an OssifiableProxy; point the ABI at the proxy address
+SMDiscovery discovery = SMDiscovery(proxyAddress);
 
 // Initialize cache for each module you need (resolves module + Accounting)
 discovery.updateModuleCache(3); // CSM (mainnet)
@@ -175,7 +178,7 @@ hoodi `0xb3dFdcE02a83454F38Fd127E6261F7AdcDA86B47`.
 
 ## Testing
 
-14 tests across 5 files cover proxy mechanics, selector collisions, queue detection, and the deploy/upgrade scripts — see `CLAUDE.md`'s Testing section for the breakdown. Framework: Foundry with forge-std.
+15 tests across 6 files cover proxy mechanics, selector collisions, storage layout, queue detection, and the deploy/upgrade scripts — see `CLAUDE.md`'s Testing section for the breakdown. Framework: Foundry with forge-std.
 
 ```bash
 forge test                          # Run all tests

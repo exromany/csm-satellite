@@ -9,21 +9,16 @@ import {OssifiableProxy} from "../src/lib/proxy/OssifiableProxy.sol";
 contract UpgradeBase is Script {
     string internal chainName;
     uint256 internal chainId;
-    address internal stakingRouterAddress;
 
     SMDiscovery public implementation;
 
     error ChainIdMismatch(uint256 actual, uint256 expected);
     error ProxyAddressNotSet();
+    error ProxyIsOssified();
 
-    constructor(
-        string memory _chainName,
-        uint256 _chainId,
-        address _stakingRouterAddress
-    ) {
+    constructor(string memory _chainName, uint256 _chainId) {
         chainName = _chainName;
         chainId = _chainId;
-        stakingRouterAddress = _stakingRouterAddress;
     }
 
     function run() external virtual {
@@ -35,7 +30,12 @@ contract UpgradeBase is Script {
         if (proxyAddress == address(0)) revert ProxyAddressNotSet();
 
         OssifiableProxy proxy = OssifiableProxy(payable(proxyAddress));
+        if (proxy.proxy__getIsOssified()) revert ProxyIsOssified();
+
         address admin = proxy.proxy__getAdmin();
+        address routerAddress = address(
+            SMDiscovery(proxyAddress).STAKING_ROUTER()
+        );
 
         // Broadcast explicitly as run()'s caller, so the identity compared against
         // `admin` is the same identity that ends up signing proxy__upgradeTo. A bare
@@ -44,7 +44,7 @@ contract UpgradeBase is Script {
         address broadcaster = msg.sender;
 
         vm.startBroadcast(broadcaster);
-        implementation = new SMDiscovery(stakingRouterAddress);
+        implementation = new SMDiscovery(routerAddress);
 
         if (broadcaster == admin) {
             proxy.proxy__upgradeTo(address(implementation));
@@ -55,6 +55,9 @@ contract UpgradeBase is Script {
             console.log("Proxy admin:", admin);
             console.log("Broadcaster:", broadcaster);
             console.log("New implementation:", address(implementation));
+            console.log(
+                "For a dry run that exercises the upgrade path, pass --sender <admin> explicitly."
+            );
             console.log("Submit this transaction from the admin:");
             console.log("  to:", proxyAddress);
             console.log("  data:");
@@ -68,5 +71,6 @@ contract UpgradeBase is Script {
         vm.stopBroadcast();
 
         console.log("Chain:", chainName);
+        console.log("StakingRouter:", routerAddress);
     }
 }

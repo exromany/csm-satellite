@@ -6,7 +6,7 @@ import "../src/SMDiscovery.sol";
 import {Batch} from "../src/interfaces/IBatch.sol";
 import {OssifiableProxy} from "../src/lib/proxy/OssifiableProxy.sol";
 
-/// @dev Regression test for the CSM queue-detection probe (see _tryGetQueuePriority).
+/// @dev Regression test for the CSM queue-detection probe (see _tryGetMaxQueuePriority).
 ///      Runs against a pinned Hoodi fork; skipped when RPC_URL is unset or points elsewhere.
 ///      Each case runs against both a direct and a proxied instance.
 contract QueueDetectionTest is Test {
@@ -52,6 +52,7 @@ contract QueueDetectionTest is Test {
     }
 
     function test_csmQueueBatches_returnsNonEmpty() external view {
+        assertEq(instances.length, 2);
         for (uint256 i = 0; i < instances.length; i++) {
             Batch[] memory batches = instances[i].getDepositQueueBatches(
                 CSM_MODULE_ID,
@@ -66,6 +67,7 @@ contract QueueDetectionTest is Test {
     function test_csmQueueBatches_revertsOnPriorityAboveRegistryBound()
         external
     {
+        assertEq(instances.length, 2);
         for (uint256 i = 0; i < instances.length; i++) {
             vm.expectRevert(
                 abi.encodeWithSelector(InvalidQueuePriority.selector, 6, 5)
@@ -75,6 +77,7 @@ contract QueueDetectionTest is Test {
     }
 
     function test_cmv2QueueBatches_revertsAsUnsupported() external {
+        assertEq(instances.length, 2);
         for (uint256 i = 0; i < instances.length; i++) {
             vm.expectRevert(
                 abi.encodeWithSelector(

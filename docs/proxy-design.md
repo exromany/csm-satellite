@@ -1,6 +1,6 @@
 # SMDiscovery behind an upgradeable proxy
 
-Status: approved design, not yet implemented.
+Status: implemented.
 
 ## Problem
 
@@ -62,8 +62,7 @@ src/SMDiscovery.sol                unchanged
 remappings.txt                     @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 ```
 
-The exact `proxy__*` signatures are taken from the vendored source; confirming them against
-that source is the first implementation step.
+The exact `proxy__*` signatures are taken from the vendored source.
 
 The upstream file is GPL-3.0. This repository is already GPL-3.0 (`LICENSE`, and
 `src/interfaces/IStakingRouter.sol` carries the same header), so vendoring raises no
@@ -108,7 +107,7 @@ Extending `test/`, following the existing fork-test pattern that skips when `RPC
   fallback and permanently shadow a colliding implementation function, silently rather than
   by reverting. This test guards every method still queued in `TODO.md`.
 - `QueueDetection.t.sol` — parameterise `setUp` to run the existing assertions against both a
-  direct and a proxied instance. `_tryGetQueuePriority` performs a `this.`-prefixed external
+  direct and a proxied instance. `_tryGetMaxQueuePriority` performs a `this.`-prefixed external
   self-call, which behind a proxy re-enters the proxy and delegatecalls back. This is expected
   to work, but a silent failure would disable CSM queue detection entirely.
 
