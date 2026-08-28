@@ -23,6 +23,11 @@
 - The repo is GPL-3.0 (settled in commit `e9ad76c`: `LICENSE`, README and every `.sol` header now agree). The vendored `OssifiableProxy.sol` keeps its original GPL-3.0 header and Lido copyright line. Every new file uses `// SPDX-License-Identifier: GPL-3.0`.
 - `SMDiscovery.sol` MUST NOT be modified by any task in this plan. If a task appears to require changing it, stop and report.
 - `moduleCache` stays at storage slot 0. New state variables may only be appended.
+- **Exactly one test function may write any given environment variable.** `vm.setEnv` mutates
+  process-global state and forge runs tests in parallel, so two tests writing the same variable
+  race. `foundry.toml`'s `threads` key does NOT fix this — it is parsed but ignored at run time on
+  Foundry 1.7.1. `test/DeployScript.t.sol` owns `PROXY_ADMIN`; `test/UpgradeScript.t.sol` owns
+  `PROXY_ADDRESS`. Never write either from `setUp()`.
 - Proxy mechanics are tested with local mocks, not forks. Only `QueueDetection.t.sol` uses a fork, and it keeps its existing skip-when-`RPC_URL`-unset behaviour.
 
 ## Out of Scope
@@ -841,39 +846,42 @@ contract UpgradeScriptTest is Test {
             address(this),
             ""
         );
+    }
+
+    /// @dev All three cases share one test function on purpose: `vm.setEnv` mutates
+    ///      process-global state and forge runs tests in parallel, so exactly one test
+    ///      function may own `PROXY_ADDRESS`. Splitting these reintroduces a real race.
+    function test_upgrade_adminUpgradesNonAdminDefersUnsetReverts() external {
         vm.setEnv("PROXY_ADDRESS", vm.toString(address(proxy)));
-    }
 
-    function test_upgrade_broadcastsWhenSenderIsAdmin() external {
-        // The test contract is the proxy admin and is also run()'s caller, so
-        // UpgradeBase's `broadcaster == admin` branch is the one exercised here.
-        UpgradeHoodi script = new UpgradeHoodi();
-        script.run();
+        // 1. The test contract is both the proxy admin and run()'s caller, so
+        //    UpgradeBase's `broadcaster == admin` branch runs and the upgrade lands.
+        UpgradeHoodi adminRun = new UpgradeHoodi();
+        adminRun.run();
 
-        assertEq(
-            proxy.proxy__getImplementation(),
-            address(script.implementation())
-        );
-        assertTrue(
-            address(script.implementation()) != firstImplementation,
-            "implementation unchanged"
-        );
-    }
+        address upgraded = address(adminRun.implementation());
+        assertEq(proxy.proxy__getImplementation(), upgraded);
+        assertTrue(upgraded != firstImplementation, "implementation unchanged");
 
-    function test_upgrade_leavesProxyUntouchedWhenSenderIsNotAdmin() external {
+        // 2. Under a different admin the script still deploys an implementation,
+        //    but must leave the proxy pointing where it was.
         proxy.proxy__changeAdmin(address(0xBEEF));
 
-        UpgradeHoodi script = new UpgradeHoodi();
-        script.run();
+        UpgradeHoodi nonAdminRun = new UpgradeHoodi();
+        nonAdminRun.run();
 
-        assertEq(proxy.proxy__getImplementation(), firstImplementation);
-    }
+        assertEq(proxy.proxy__getImplementation(), upgraded);
+        assertTrue(
+            address(nonAdminRun.implementation()) != upgraded,
+            "expected a freshly deployed implementation"
+        );
 
-    function test_upgrade_revertsWhenProxyAddressUnset() external {
+        // 3. An unset PROXY_ADDRESS must revert before anything is broadcast.
         vm.setEnv("PROXY_ADDRESS", vm.toString(address(0)));
-        UpgradeHoodi script = new UpgradeHoodi();
+
+        UpgradeHoodi unsetRun = new UpgradeHoodi();
         vm.expectRevert(UpgradeBase.ProxyAddressNotSet.selector);
-        script.run();
+        unsetRun.run();
     }
 }
 ```
@@ -1001,7 +1009,9 @@ contract UpgradeMainnet is UpgradeBase {
 
 Run: `forge test --match-path test/UpgradeScript.t.sol -vv`
 
-Expected: 3 tests PASS.
+Expected: 1 test PASS.
+
+Then run a bare `forge test` (no `--threads` flag) at least 5 consecutive times and confirm the same pass count every time. The suite writes process-global env vars, so repetition is the acceptance criterion, not a single green run.
 
 - [ ] **Step 5: Add the Just recipes**
 
