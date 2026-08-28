@@ -6,7 +6,7 @@ Node Operator search and pagination for CSM and Curated Module v2 through a sing
 
 - **CSM & CMv2 Support**: Works with the Community Staking Module (full support, incl. deposit queue) and Curated Module v2 (discovery only — no queue operations)
 - **Dynamic Routing**: Module and Accounting addresses resolved via StakingRouter and cached on demand
-- **Stateless & Simple**: No ownership, view-only functions, explicit cache management
+- **Simple**: No ownership, view-only functions, explicit cache management
 - **Interface Detection**: Gracefully handles CSM-specific features (deposit queues) via `try/catch`
 - **Future-Proof**: Compatible with any module implementing `IStakingModule` and exposing `ACCOUNTING()`
 
@@ -89,11 +89,30 @@ CHAIN=mainnet RPC_URL=<your-rpc> just deploy-live
 CHAIN=mainnet RPC_URL=<your-rpc> just verify-live
 ```
 
+### Upgrading
+
+`SMDiscovery` sits behind an `OssifiableProxy`, so a new release replaces the
+implementation and leaves the address alone.
+
+```bash
+# Dry run (recommended first)
+CHAIN=mainnet PROXY_ADDRESS=<proxy> just upgrade-live-dry
+
+# Deploy the new implementation and upgrade
+CHAIN=mainnet RPC_URL=<your-rpc> PROXY_ADDRESS=<proxy> just upgrade-live
+```
+
+If the broadcaster is the proxy admin, the upgrade is sent directly. Otherwise the
+script deploys the implementation and logs the `proxy__upgradeTo` calldata for the
+admin multisig to submit.
+
 ### Environment Variables
 
 - `CHAIN`: Target chain (`mainnet`, `hoodi`) - defaults to `mainnet`
 - `RPC_URL`: RPC endpoint for live deployments
 - `ANVIL_IP_ADDR`: Anvil host address (defaults to `127.0.0.1`)
+- `PROXY_ADMIN`: Admin address for the OssifiableProxy - required by `just deploy-live`
+- `PROXY_ADDRESS`: Existing proxy to upgrade - required by `just upgrade-live`
 
 ## Usage Example
 
@@ -145,10 +164,14 @@ just clean          # Clean artifacts
 
 ## Contract Addresses
 
-| Chain          | StakingRouter                                | SMDiscovery                                  |
-|----------------|----------------------------------------------|----------------------------------------------|
-| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | `0x6a9c16626D64dFe7A185eb6378F8eB901f96281C` |
-| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | `0xb3dFdcE02a83454F38Fd127E6261F7AdcDA86B47` |
+| Chain          | StakingRouter                                | SMDiscovery (proxy)     | Implementation |
+|----------------|----------------------------------------------|-------------------------|----------------|
+| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | pending proxy migration | pending        |
+| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | pending proxy migration | pending        |
+
+Pre-proxy deployments, deprecated once the proxies are live and kept only for reference:
+mainnet `0x6a9c16626D64dFe7A185eb6378F8eB901f96281C`,
+hoodi `0xb3dFdcE02a83454F38Fd127E6261F7AdcDA86B47`.
 
 ## Testing
 

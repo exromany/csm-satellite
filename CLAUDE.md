@@ -103,10 +103,14 @@ just verify-live
 
 ## Deployed Contracts
 
-| Chain          | StakingRouter                                | SMDiscovery                                  |
-|----------------|----------------------------------------------|----------------------------------------------|
-| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | `0x6a9c16626D64dFe7A185eb6378F8eB901f96281C` |
-| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | `0xb3dFdcE02a83454F38Fd127E6261F7AdcDA86B47` |
+| Chain          | StakingRouter                                | SMDiscovery (proxy)                          | Implementation |
+|----------------|----------------------------------------------|----------------------------------------------|----------------|
+| Mainnet (1)    | `0xFdDf38947aFB03C621C71b06C9C70bce73f12999` | pending proxy migration                      | pending        |
+| Hoodi (560048) | `0xCc820558B39ee15C7C45B59390B503b83fb499A8` | pending proxy migration                      | pending        |
+
+Pre-proxy deployments, deprecated once the proxies are live and kept only for reference:
+mainnet `0x6a9c16626D64dFe7A185eb6378F8eB901f96281C`,
+hoodi `0xb3dFdcE02a83454F38Fd127E6261F7AdcDA86B47`.
 
 ## Key Technical Details
 
@@ -119,6 +123,22 @@ discovery.updateModuleCache(moduleId);
 // Use cached address for efficient queries
 discovery.findNodeOperatorsByAddress(moduleId, address, offset, limit, mode);
 ```
+
+### Proxy Pattern
+
+`SMDiscovery` sits behind Lido's `OssifiableProxy` (`src/lib/proxy/OssifiableProxy.sol`,
+vendored from CSM with the pragma relaxed to 0.8.24). The address is stable across releases.
+
+- `SMDiscovery` has no initializer: `STAKING_ROUTER` is `immutable` and lives in the
+  implementation bytecode; `moduleCache` is filled by the permissionless `updateModuleCache()`.
+- `moduleCache` occupies storage slot 0. New state variables may only be appended.
+- Releasing a new implementation: `CHAIN=<chain> PROXY_ADDRESS=<proxy> just upgrade-live`.
+  If the broadcaster is the proxy admin the upgrade is sent directly; otherwise the script
+  logs the `proxy__upgradeTo` calldata for the admin multisig to submit.
+- `proxy__ossify()` freezes the implementation permanently once the ABI settles.
+
+Environment variables: `PROXY_ADMIN` (required by deploy scripts), `PROXY_ADDRESS`
+(required by upgrade scripts).
 
 ### Interface Detection (CSM-specific features)
 
@@ -158,7 +178,16 @@ Artifacts stored in `./artifacts/latest/` with transactions in `transactions.jso
 
 ## Testing
 
-**Current Status**: No custom tests implemented
+**Current Status**: Proxy mechanics covered by local-mock tests; queue detection covered by
+a Hoodi fork test that skips when `RPC_URL` is unset.
+
+| File | Covers |
+|------|--------|
+| `test/Proxy.t.sol` | immutables through delegatecall, cache preservation across upgrade, admin control, ossification |
+| `test/SelectorCollision.t.sol` | no proxy selector shadows an implementation method |
+| `test/QueueDetection.t.sol` | CSM queue detection, direct and proxied (fork) |
+| `test/DeployScript.t.sol` | deploy script wires proxy and seeds cache (fork) |
+| `test/UpgradeScript.t.sol` | upgrade script admin/non-admin branches |
 
 **Framework**: Foundry with forge-std
 

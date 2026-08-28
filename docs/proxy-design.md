@@ -56,13 +56,18 @@ field order or types.
 
 ```
 lib/openzeppelin-contracts         new submodule, pinned to v5.4.0 (CSM's own pin)
-src/lib/proxy/OssifiableProxy.sol  vendored verbatim from lidofinance/community-staking-module
+src/lib/proxy/OssifiableProxy.sol  vendored from lidofinance/community-staking-module;
+                                   sole modification is the pragma, 0.8.33 -> 0.8.24
 src/SMDiscovery.sol                unchanged
 remappings.txt                     @openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
 ```
 
 The exact `proxy__*` signatures are taken from the vendored source; confirming them against
 that source is the first implementation step.
+
+The upstream file is GPL-3.0. This repository is already GPL-3.0 (`LICENSE`, and
+`src/interfaces/IStakingRouter.sol` carries the same header), so vendoring raises no
+licensing question. OpenZeppelin is pinned at `v5.4.0`, whose strictest pragma is `^0.8.22`.
 
 The OZ version pin is load-bearing, not incidental. OZ v5.6.0 added an
 `ERC1967ProxyUninitialized` guard that reverts when `ERC1967Proxy` is constructed with empty
@@ -80,9 +85,9 @@ implicitly. Local anvil runs (`just deploy`) therefore need `PROXY_ADMIN` set in
 `just`'s `set dotenv-load` already picks up. The script deploys the implementation, then the proxy, then initialises the
 module cache *through the proxy address*.
 
-New `UpgradeBase.s.sol` with `UpgradeMainnet` / `UpgradeHoodi` subclasses carrying the
-hardcoded proxy address per chain, mirroring how `stakingRouterAddress` is carried today. It
-deploys only a new implementation, then branches:
+New `UpgradeBase.s.sol` with `UpgradeMainnet` / `UpgradeHoodi` subclasses, reading the proxy
+address from `PROXY_ADDRESS` rather than hardcoding it per chain. It deploys only a new
+implementation, then branches:
 
 - caller is the proxy admin (hoodi, team EOA) — broadcast `proxy__upgradeTo` directly;
 - caller is not (mainnet, multisig) — log the target and the `proxy__upgradeTo` calldata.
